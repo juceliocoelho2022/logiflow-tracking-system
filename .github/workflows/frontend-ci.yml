@@ -1,0 +1,36 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard-web/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dashboard-web/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  build-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard-web
+        run: npm install
+
+      - name: Build dashboard
+        working-directory: dashboard-web
+        run: npm run build
