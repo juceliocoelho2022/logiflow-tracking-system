@@ -1,0 +1,35 @@
+### Health
+GET http://localhost:8090/actuator/health
+
+### 1 - Pedido criado
+POST http://localhost:8090/api/tracking/events
+Content-Type: application/json
+
+{
+  "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da001",
+  "trackingCode": "LF2026000145BR",
+  "orderId": "PED-2026-000145",
+  "status": "PEDIDO_CRIADO",
+  "city": "São Paulo",
+  "state": "SP",
+  "description": "Pedido criado e aguardando processamento",
+  "occurredAt": "2026-08-12T08:35:00Z"
+}
+
+### 2 - Em transporte
+POST http://localhost:8090/api/tracking/events
+Content-Type: application/json
+
+{
+  "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da002",
+  "trackingCode": "LF2026000145BR",
+  "orderId": "PED-2026-000145",
+  "status": "EM_TRANSPORTE",
+  "city": "Guarulhos",
+  "state": "SP",
+  "description": "Pedido em transferência para o centro de distribuição",
+  "occurredAt": "2026-08-12T12:15:00Z"
+}
+
+### Consultar rastreamento
+GET http://localhost:8090/api/tracking/LF2026000145BR

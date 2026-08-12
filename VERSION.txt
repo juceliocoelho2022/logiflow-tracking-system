@@ -1,0 +1,4 @@
+LogiFlow Tracking - Starter V1
+Data: 2026-08-12
+Java: 21
+Spring Boot: 3.5.16
