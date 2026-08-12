@@ -4,6 +4,7 @@ GET http://localhost:8090/actuator/health
 ### 1 - Pedido criado
 POST http://localhost:8090/api/tracking/events
 Content-Type: application/json
+X-Correlation-Id: journey-LF2026000145BR
 
 {
   "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da001",
@@ -19,6 +20,7 @@ Content-Type: application/json
 ### 2 - Em transporte
 POST http://localhost:8090/api/tracking/events
 Content-Type: application/json
+X-Correlation-Id: journey-LF2026000145BR
 
 {
   "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da002",
@@ -34,6 +36,7 @@ Content-Type: application/json
 ### 3 - Saiu para entrega
 POST http://localhost:8090/api/tracking/events
 Content-Type: application/json
+X-Correlation-Id: journey-LF2026000145BR
 
 {
   "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da003",
@@ -49,6 +52,7 @@ Content-Type: application/json
 ### 4 - Entregue (use um novo UUID se repetir o teste)
 POST http://localhost:8090/api/tracking/events
 Content-Type: application/json
+X-Correlation-Id: journey-LF2026000145BR
 
 {
   "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da004",

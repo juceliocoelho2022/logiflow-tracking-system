@@ -4,6 +4,7 @@ import java.util.UUID;
 
 public record TrackingAcceptedResponse(
         UUID eventId,
+        String correlationId,
         String trackingCode,
         String status,
         String message
