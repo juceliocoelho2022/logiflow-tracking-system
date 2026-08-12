@@ -1,6 +1,6 @@
 # 🚚 LogiFlow Tracking
 
-> Plataforma de rastreamento logístico orientada a eventos com **Java 21, Spring Boot, Apache Kafka, PostgreSQL, Docker e React**.
+> Plataforma de rastreamento logístico orientada a eventos com **Java 21, Spring Boot, Apache Kafka, PostgreSQL, Docker, React e Server-Sent Events (SSE)**.
 
 <p align="left">
   <img src="https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white" alt="Java 21" />
@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React" />
   <img src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/SSE-Realtime-22c55e" alt="Server-Sent Events" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker" />
 </p>
 
@@ -23,7 +24,7 @@ O **LogiFlow Tracking** simula o núcleo de rastreamento de uma plataforma logí
 
 A API recebe eventos de movimentação, publica no **Apache Kafka** e responde com **HTTP 202 Accepted**. Um consumidor processa os eventos de forma assíncrona, aplica idempotência por `eventId` e persiste a timeline no **PostgreSQL**.
 
-O projeto também possui um **dashboard React** que consulta a Tracking API e transforma os dados técnicos em uma experiência visual de rastreamento.
+O projeto também possui um **dashboard React** que consulta a Tracking API e mantém uma conexão **Server-Sent Events (SSE)** aberta. Quando um novo evento é persistido, o backend publica a timeline atualizada e o React altera a tela automaticamente, sem polling e sem nova busca manual.
 
 ### Conceitos praticados
 
@@ -33,6 +34,8 @@ O projeto também possui um **dashboard React** que consulta a Tracking API e tr
 - idempotência;
 - mensageria com Kafka;
 - REST APIs;
+- atualização em tempo real com SSE;
+- EventSource no frontend;
 - PostgreSQL + Flyway;
 - Docker Compose;
 - React + Vite;
@@ -56,7 +59,11 @@ O projeto também possui um **dashboard React** que consulta a Tracking API e tr
 - ✅ Busca por código de rastreio
 - ✅ Status atual e localização
 - ✅ Timeline visual de eventos
-- ✅ Estados de loading e erro
+- ✅ Server-Sent Events (SSE)
+- ✅ EventSource no React
+- ✅ Atualização automática da timeline
+- ✅ Indicador de conexão em tempo real
+- ✅ Estados de loading, erro e reconexão
 - ✅ Backend CI + Frontend CI
 
 ---
@@ -76,54 +83,35 @@ flowchart LR
     B -->|consulta| E
     B -->|status + timeline| F
 
-    G[Kafka UI] --> C
+    D -->|novo evento persistido| G[Tracking SSE Service]
+    G -->|tracking-update| F
+
+    H[Kafka UI] --> C
 ```
 
-### Fluxo de escrita
+### Fluxo em tempo real
 
 ```text
-Cliente / Microsserviço
-        ↓
-POST /api/tracking/events
-        ↓
-Tracking Service
-        ↓
+Novo evento
+    ↓
 Apache Kafka
-        ↓
+    ↓
 Tracking Consumer
-        ↓
-Idempotência
-        ↓
+    ↓
 PostgreSQL
-```
-
-### Fluxo de consulta
-
-```text
-Dashboard React
-      ↓
-Código de rastreio
-      ↓
-GET /api/tracking/{trackingCode}
-      ↓
-Tracking Service
-      ↓
-PostgreSQL
-      ↓
-Status atual + Timeline
-      ↓
-Interface visual
+    ↓
+TrackingSseService
+    ↓
+Server-Sent Events
+    ↓
+EventSource / React
+    ↓
+Timeline atualizada automaticamente
 ```
 
 ---
 
 # 🖥️ Dashboard Web
-
-O dashboard fica em:
-
-```text
-dashboard-web/
-```
 
 A interface possui:
 
@@ -134,31 +122,36 @@ A interface possui:
 - data da última atualização;
 - timeline cronológica;
 - identificação do evento atual;
+- indicador de atualização em tempo real;
+- reconexão automática do EventSource;
 - tratamento de código não encontrado;
 - loading visual;
 - layout responsivo para desktop e mobile.
 
-### Integração com o backend
+## ⚡ Atualização em tempo real com SSE
 
-Durante o desenvolvimento, o Vite encaminha:
-
-```text
-/api/*
-```
-
-para:
-
-```text
-http://localhost:8090
-```
-
-Assim, o frontend pode consultar:
+Depois que um código de rastreamento é carregado, o React abre uma conexão com:
 
 ```http
-GET /api/tracking/{trackingCode}
+GET /api/tracking/{trackingCode}/stream
+Accept: text/event-stream
 ```
 
-sem precisar duplicar a URL do backend nos componentes.
+O backend mantém a inscrição por `trackingCode`. Quando o Consumer persiste um novo evento válido, o `TrackingSseService` envia um evento chamado:
+
+```text
+tracking-update
+```
+
+O navegador recebe esse evento por `EventSource` e substitui os dados da tela automaticamente.
+
+### Screenshot do fluxo validado
+
+O cenário abaixo foi validado com a sequência **PEDIDO_CRIADO → EM_TRANSPORTE → SAIU_PARA_ENTREGA → ENTREGUE**. O último evento chegou pela arquitetura assíncrona e a interface exibiu **4 eventos** na timeline.
+
+![Dashboard LogiFlow com atualização em tempo real](docs/images/logiflow-dashboard-realtime.webp)
+
+Durante o desenvolvimento, o Vite encaminha `/api/*` para `http://localhost:8090`, permitindo que o frontend use REST e SSE sem duplicar a URL do backend nos componentes.
 
 ---
 
@@ -182,12 +175,7 @@ SAIU_PARA_ENTREGA
 ENTREGUE
 ```
 
-Estados alternativos:
-
-```text
-ENTREGA_NAO_REALIZADA
-CANCELADO
-```
+Estados alternativos: `ENTREGA_NAO_REALIZADA` e `CANCELADO`.
 
 ---
 
@@ -197,13 +185,15 @@ CANCELADO
 |---|---|
 | Java 21 | Backend |
 | Spring Boot 3.5.16 | Framework backend |
-| Spring Web | API REST |
+| Spring Web | REST API e SSE |
 | Spring Data JPA | Persistência |
 | Spring for Apache Kafka | Producer e Consumer |
 | Apache Kafka 3.9.1 | Mensageria |
 | PostgreSQL 17 | Banco relacional |
 | Flyway | Versionamento do schema |
+| SseEmitter | Publicação de eventos em tempo real |
 | React 19 | Interface web |
+| EventSource | Consumo do stream SSE |
 | Vite 8 | Build e servidor frontend |
 | Docker Compose | Infraestrutura local |
 | Spring Boot Actuator | Health checks |
@@ -216,24 +206,27 @@ CANCELADO
 
 ```text
 logiflow-tracking-system/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml
-│       └── frontend-ci.yml
+├── .github/workflows/
+│   ├── ci.yml
+│   └── frontend-ci.yml
 ├── dashboard-web/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── styles.css
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
-├── docs/
-│   └── images/
-├── tracking-service/
-│   ├── Dockerfile
-│   ├── pom.xml
 │   └── src/
+│       ├── App.jsx
+│       ├── main.jsx
+│       ├── realtime.css
+│       └── styles.css
+├── docs/images/
+│   ├── logiflow-tracking-architecture.png
+│   └── logiflow-dashboard-realtime.webp
+├── tracking-service/
+│   └── src/main/java/br/com/logiflow/tracking/
+│       ├── controller/
+│       ├── kafka/
+│       ├── repository/
+│       └── service/
+│           ├── TrackingCommandService.java
+│           ├── TrackingQueryService.java
+│           └── TrackingSseService.java
 ├── docker-compose.yml
 ├── pom.xml
 ├── requests.http
@@ -246,42 +239,24 @@ logiflow-tracking-system/
 
 ## 1. Infraestrutura
 
-Na raiz do projeto:
-
 ```bash
 docker compose up -d postgres kafka kafka-ui
 ```
 
 ## 2. Backend
 
-Pelo IntelliJ IDEA, execute:
-
-```text
-TrackingServiceApplication
-```
-
-ou:
+Pelo IntelliJ IDEA, execute `TrackingServiceApplication`, ou:
 
 ```bash
 cd tracking-service
 mvn spring-boot:run
 ```
 
-Backend:
+Backend: `http://localhost:8090`
 
-```text
-http://localhost:8090
-```
-
-Health check:
-
-```text
-http://localhost:8090/actuator/health
-```
+Health check: `http://localhost:8090/actuator/health`
 
 ## 3. Dashboard React
-
-Abra outro terminal na raiz:
 
 ```bash
 cd dashboard-web
@@ -289,17 +264,9 @@ npm install
 npm run dev
 ```
 
-Acesse:
+Acesse `http://localhost:5173` e informe um código existente, por exemplo `LF2026000145BR`.
 
-```text
-http://localhost:5173
-```
-
-Depois informe um código existente, por exemplo:
-
-```text
-LF2026000145BR
-```
+Quando a conexão SSE estiver ativa, o dashboard exibirá **Atualização em tempo real**.
 
 ---
 
@@ -309,6 +276,7 @@ LF2026000145BR
 |---|---|
 | Dashboard React | `http://localhost:5173` |
 | Tracking API | `http://localhost:8090` |
+| SSE Stream | `http://localhost:8090/api/tracking/{trackingCode}/stream` |
 | Health Check | `http://localhost:8090/actuator/health` |
 | Kafka UI | `http://localhost:8091` |
 | PostgreSQL | `localhost:5435` |
@@ -327,22 +295,18 @@ Content-Type: application/json
 
 ```json
 {
-  "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da001",
+  "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da004",
   "trackingCode": "LF2026000145BR",
   "orderId": "PED-2026-000145",
-  "status": "PEDIDO_CRIADO",
+  "status": "ENTREGUE",
   "city": "Sao Paulo",
   "state": "SP",
-  "description": "Pedido criado e aguardando processamento",
-  "occurredAt": "2026-08-12T08:35:00Z"
+  "description": "Pedido entregue ao destinatario",
+  "occurredAt": "2026-08-12T15:45:00Z"
 }
 ```
 
-Resposta assíncrona:
-
-```text
-202 Accepted
-```
+Resposta: `202 Accepted`.
 
 ## Consultar rastreamento
 
@@ -350,59 +314,46 @@ Resposta assíncrona:
 GET /api/tracking/LF2026000145BR
 ```
 
+Exemplo do cenário validado:
+
 ```json
 {
   "trackingCode": "LF2026000145BR",
   "orderId": "PED-2026-000145",
-  "currentStatus": "EM_TRANSPORTE",
-  "currentCity": "Guarulhos",
+  "currentStatus": "ENTREGUE",
+  "currentCity": "Sao Paulo",
   "currentState": "SP",
-  "lastUpdate": "2026-08-12T10:00:00Z",
+  "lastUpdate": "2026-08-12T15:45:00Z",
   "history": [
-    {
-      "status": "PEDIDO_CRIADO",
-      "city": "Sao Paulo",
-      "state": "SP",
-      "description": "Pedido criado e aguardando processamento",
-      "occurredAt": "2026-08-12T08:35:00Z"
-    },
-    {
-      "status": "EM_TRANSPORTE",
-      "city": "Guarulhos",
-      "state": "SP",
-      "description": "Pedido enviado ao centro de distribuicao",
-      "occurredAt": "2026-08-12T10:00:00Z"
-    }
+    { "status": "PEDIDO_CRIADO" },
+    { "status": "EM_TRANSPORTE" },
+    { "status": "SAIU_PARA_ENTREGA" },
+    { "status": "ENTREGUE" }
   ]
 }
+```
+
+## Assinar atualizações em tempo real
+
+```http
+GET /api/tracking/LF2026000145BR/stream
+Accept: text/event-stream
+```
+
+Eventos SSE publicados:
+
+```text
+connected
+tracking-update
 ```
 
 ---
 
 # ⚙️ CI
 
-## Backend
+O backend executa `mvn clean verify` com Java 21 e o frontend executa `npm install` + `npm run build` com Node.js 22 via GitHub Actions.
 
-```text
-.github/workflows/ci.yml
-```
-
-Executa build e testes Maven com Java 21.
-
-## Frontend
-
-```text
-.github/workflows/frontend-ci.yml
-```
-
-Executa:
-
-```bash
-npm install
-npm run build
-```
-
-com Node.js 22.
+A implementação de SSE foi desenvolvida em feature branch, validada pelos dois pipelines e integrada por Pull Request.
 
 ---
 
@@ -428,15 +379,16 @@ com Node.js 22.
 - [ ] Testcontainers
 - [ ] Integração com outros serviços
 
-### Sprint 3 — Experiência do usuário
+### Sprint 3 — Experiência do usuário ✅
 
 - [x] Dashboard React
 - [x] Busca por código de rastreio
 - [x] Status atual
 - [x] Timeline visual
 - [x] Layout responsivo
-- [ ] Screenshot oficial no README
-- [ ] Atualização em tempo real com SSE ou WebSocket
+- [x] Screenshot oficial no README
+- [x] Atualização em tempo real com SSE
+- [x] Indicador de conexão / reconexão
 - [ ] Mapa de movimentações
 - [ ] Previsão de entrega
 - [ ] Notificações
@@ -453,10 +405,10 @@ com Node.js 22.
 
 ## 🎓 Conceitos demonstrados
 
-`Java 21` · `Spring Boot` · `REST API` · `Kafka` · `Event-Driven Architecture` · `PostgreSQL` · `JPA` · `Flyway` · `Docker` · `React` · `Vite` · `Idempotência` · `Processamento Assíncrono` · `Consistência Eventual` · `CI/CD`
+`Java 21` · `Spring Boot` · `REST API` · `Kafka` · `Event-Driven Architecture` · `PostgreSQL` · `JPA` · `Flyway` · `Docker` · `React` · `Vite` · `Server-Sent Events` · `EventSource` · `Idempotência` · `Processamento Assíncrono` · `Consistência Eventual` · `Realtime UI` · `CI/CD`
 
 ---
 
 ## 📌 Status
 
-🚧 **Em desenvolvimento ativo.** O núcleo backend e a primeira versão do dashboard web estão funcionais. As próximas etapas concentram-se em resiliência, atualização em tempo real, mapa e observabilidade.
+🚧 **Em desenvolvimento ativo.** O núcleo de tracking, o dashboard React e a atualização em tempo real via SSE estão funcionais e validados ponta a ponta. As próximas etapas concentram-se em resiliência, integração entre serviços, mapa e observabilidade.
