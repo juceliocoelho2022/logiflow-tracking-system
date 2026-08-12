@@ -21,10 +21,10 @@ public class TrackingCommandService {
     }
 
     @Transactional
-    public void register(TrackingEventMessage message) {
+    public boolean register(TrackingEventMessage message) {
         if (repository.existsByEventId(message.eventId())) {
             log.info("Evento duplicado ignorado: {}", message.eventId());
-            return;
+            return false;
         }
 
         TrackingEvent entity = new TrackingEvent(
@@ -39,11 +39,13 @@ public class TrackingCommandService {
         );
 
         try {
-            repository.save(entity);
+            repository.saveAndFlush(entity);
             log.info("Evento de rastreamento persistido: eventId={}, trackingCode={}, status={}",
                     message.eventId(), message.trackingCode(), message.status());
+            return true;
         } catch (DataIntegrityViolationException ex) {
             log.info("Evento já processado por outra execução: {}", message.eventId());
+            return false;
         }
     }
 }
