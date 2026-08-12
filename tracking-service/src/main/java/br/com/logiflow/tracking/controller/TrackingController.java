@@ -10,9 +10,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/tracking")
 public class TrackingController {
+
+    private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
     private final TrackingEventPublisher publisher;
     private final TrackingQueryService queryService;
@@ -29,16 +33,23 @@ public class TrackingController {
     }
 
     @PostMapping("/events")
-    public ResponseEntity<TrackingAcceptedResponse> publishEvent(@Valid @RequestBody TrackingEventRequest request) {
-        TrackingEventMessage message = TrackingEventMessage.from(request);
+    public ResponseEntity<TrackingAcceptedResponse> publishEvent(
+            @Valid @RequestBody TrackingEventRequest request,
+            @RequestHeader(value = CORRELATION_ID_HEADER, required = false) String correlationId
+    ) {
+        String resolvedCorrelationId = resolveCorrelationId(correlationId);
+        TrackingEventMessage message = TrackingEventMessage.from(request, resolvedCorrelationId);
         publisher.publish(message);
 
-        return ResponseEntity.accepted().body(new TrackingAcceptedResponse(
-                request.eventId(),
-                request.trackingCode(),
-                "ACCEPTED",
-                "Evento enviado para processamento assíncrono"
-        ));
+        return ResponseEntity.accepted()
+                .header(CORRELATION_ID_HEADER, resolvedCorrelationId)
+                .body(new TrackingAcceptedResponse(
+                        request.eventId(),
+                        resolvedCorrelationId,
+                        request.trackingCode(),
+                        "ACCEPTED",
+                        "Evento enviado para processamento assíncrono"
+                ));
     }
 
     @GetMapping("/{trackingCode}")
@@ -49,5 +60,12 @@ public class TrackingController {
     @GetMapping(path = "/{trackingCode}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable String trackingCode) {
         return sseService.subscribe(trackingCode);
+    }
+
+    private String resolveCorrelationId(String correlationId) {
+        if (correlationId == null || correlationId.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+        return correlationId.trim();
     }
 }
