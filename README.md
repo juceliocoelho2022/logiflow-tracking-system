@@ -76,7 +76,19 @@ flowchart LR
     B -->|consulta| E
     F[Kafka UI] --> C
 ```
+## 🏗️ Arquitetura
 
+O diagrama abaixo apresenta a arquitetura do **LogiFlow Tracking System**, evidenciando o processamento assíncrono de eventos, a persistência da timeline de rastreamento e a integração entre os componentes principais da solução.
+
+![Arquitetura do LogiFlow Tracking](docs/images/logiflow-tracking-architecture.png)
+
+**Principais elementos da arquitetura:**
+- **Clientes / Sistemas** enviam eventos de rastreamento;
+- **Tracking Service** recebe a requisição REST e publica no Kafka;
+- **Apache Kafka** desacopla produtores e consumidores;
+- **Tracking Event Consumer** processa os eventos com idempotência;
+- **PostgreSQL** persiste o histórico e o status atual;
+- **Query API** consulta o código de rastreio e devolve a timeline.
 ## 🔄 Fluxo de rastreamento
 
 Exemplo de evolução de um pedido:
