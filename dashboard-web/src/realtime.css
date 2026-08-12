@@ -1,0 +1,59 @@
+.live-status {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(7, 18, 32, 0.58);
+  color: #8196ad;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.live-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #71869d;
+}
+
+.live-status.connecting .live-status-dot,
+.live-status.reconnecting .live-status-dot {
+  background: #f5c66c;
+  box-shadow: 0 0 0 4px rgba(245, 198, 108, 0.08);
+  animation: realtime-pulse 1.2s ease-in-out infinite;
+}
+
+.live-status.live {
+  color: #63ddb3;
+  border-color: rgba(45, 212, 162, 0.18);
+  background: rgba(45, 212, 162, 0.06);
+}
+
+.live-status.live .live-status-dot {
+  background: #2dd4a2;
+  box-shadow: 0 0 0 4px rgba(45, 212, 162, 0.08);
+}
+
+@keyframes realtime-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@media (max-width: 680px) {
+  .live-status {
+    justify-content: flex-start;
+  }
+}
