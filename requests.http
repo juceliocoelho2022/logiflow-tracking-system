@@ -31,5 +31,39 @@ Content-Type: application/json
   "occurredAt": "2026-08-12T12:15:00Z"
 }
 
+### 3 - Saiu para entrega
+POST http://localhost:8090/api/tracking/events
+Content-Type: application/json
+
+{
+  "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da003",
+  "trackingCode": "LF2026000145BR",
+  "orderId": "PED-2026-000145",
+  "status": "SAIU_PARA_ENTREGA",
+  "city": "São Paulo",
+  "state": "SP",
+  "description": "Pedido saiu para entrega ao destinatário",
+  "occurredAt": "2026-08-12T13:30:00Z"
+}
+
+### 4 - Entregue (use um novo UUID se repetir o teste)
+POST http://localhost:8090/api/tracking/events
+Content-Type: application/json
+
+{
+  "eventId": "64f16422-54aa-4e83-8dc3-78edfd9da004",
+  "trackingCode": "LF2026000145BR",
+  "orderId": "PED-2026-000145",
+  "status": "ENTREGUE",
+  "city": "São Paulo",
+  "state": "SP",
+  "description": "Pedido entregue ao destinatário",
+  "occurredAt": "2026-08-12T15:45:00Z"
+}
+
 ### Consultar rastreamento
 GET http://localhost:8090/api/tracking/LF2026000145BR
+
+### Stream SSE - mantenha a conexão aberta
+GET http://localhost:8090/api/tracking/LF2026000145BR/stream
+Accept: text/event-stream

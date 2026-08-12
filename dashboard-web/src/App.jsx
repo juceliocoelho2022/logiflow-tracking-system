@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import './realtime.css'
 
 const STATUS_META = {
   PEDIDO_CRIADO: { label: 'Pedido criado', icon: '📦', tone: 'neutral' },
@@ -11,6 +12,13 @@ const STATUS_META = {
   ENTREGUE: { label: 'Entregue', icon: '✓', tone: 'success' },
   ENTREGA_NAO_REALIZADA: { label: 'Entrega não realizada', icon: '!', tone: 'danger' },
   CANCELADO: { label: 'Cancelado', icon: '×', tone: 'danger' },
+}
+
+const REALTIME_LABEL = {
+  idle: 'Tempo real inativo',
+  connecting: 'Conectando tempo real…',
+  live: 'Atualização em tempo real',
+  reconnecting: 'Reconectando tempo real…',
 }
 
 function getStatusMeta(status) {
@@ -45,6 +53,7 @@ export default function App() {
   const [tracking, setTracking] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [realtimeState, setRealtimeState] = useState('idle')
 
   const history = useMemo(() => {
     if (!tracking?.history) return []
@@ -53,6 +62,45 @@ export default function App() {
       (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
     )
   }, [tracking])
+
+  useEffect(() => {
+    if (!tracking?.trackingCode) {
+      setRealtimeState('idle')
+      return undefined
+    }
+
+    const code = tracking.trackingCode
+    setRealtimeState('connecting')
+
+    const eventSource = new EventSource(
+      `/api/tracking/${encodeURIComponent(code)}/stream`,
+    )
+
+    const handleConnected = () => {
+      setRealtimeState('live')
+    }
+
+    const handleTrackingUpdate = (event) => {
+      try {
+        const updatedTracking = JSON.parse(event.data)
+        setTracking(updatedTracking)
+        setRealtimeState('live')
+      } catch {
+        setRealtimeState('reconnecting')
+      }
+    }
+
+    eventSource.addEventListener('connected', handleConnected)
+    eventSource.addEventListener('tracking-update', handleTrackingUpdate)
+    eventSource.onopen = () => setRealtimeState('live')
+    eventSource.onerror = () => setRealtimeState('reconnecting')
+
+    return () => {
+      eventSource.removeEventListener('connected', handleConnected)
+      eventSource.removeEventListener('tracking-update', handleTrackingUpdate)
+      eventSource.close()
+    }
+  }, [tracking?.trackingCode])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -66,6 +114,7 @@ export default function App() {
 
     setLoading(true)
     setError('')
+    setTracking(null)
 
     try {
       const response = await fetch(`/api/tracking/${encodeURIComponent(code)}`)
@@ -178,6 +227,10 @@ export default function App() {
                 <div className="tracking-code-block">
                   <span>Código de rastreio</span>
                   <strong>{tracking.trackingCode}</strong>
+                  <div className={`live-status ${realtimeState}`}>
+                    <span className="live-status-dot" aria-hidden="true" />
+                    {REALTIME_LABEL[realtimeState]}
+                  </div>
                 </div>
               </div>
 
@@ -273,7 +326,7 @@ export default function App() {
 
       <footer>
         <span>LogiFlow Tracking</span>
-        <span>Java 21 · Spring Boot · Apache Kafka · React</span>
+        <span>Java 21 · Spring Boot · Apache Kafka · React · SSE</span>
       </footer>
     </div>
   )
